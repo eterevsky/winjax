@@ -1,0 +1,33 @@
+# winjax: native Windows CUDA build configuration.
+# Usage: --bazelrc=this-file (startup option), then --config=winjax_cuda.
+# Hand-authored override repos replace the Linux-only hermetic CUDA repo rules.
+
+common:winjax_cuda --override_repository=local_config_cc=C:/Users/oleg/winjax/toolchains/local_config_cc
+common:winjax_cuda --override_repository=xla=C:/Users/oleg/winjax/xla
+common:winjax_cuda --override_repository=local_config_cuda=C:/Users/oleg/winjax/toolchains/local_config_cuda_win
+common:winjax_cuda --override_repository=cuda_cudart=C:/Users/oleg/winjax/toolchains/cuda_repos/cuda_cudart
+common:winjax_cuda --override_repository=cuda_driver=C:/Users/oleg/winjax/toolchains/cuda_repos/cuda_driver
+common:winjax_cuda --override_repository=cuda_cccl=C:/Users/oleg/winjax/toolchains/cuda_repos/cuda_cccl
+common:winjax_cuda --override_repository=cuda_crt=C:/Users/oleg/winjax/toolchains/cuda_repos/cuda_crt
+common:winjax_cuda --override_repository=cuda_cublas=C:/Users/oleg/winjax/toolchains/cuda_repos/cuda_cublas
+common:winjax_cuda --override_repository=cuda_cudnn=C:/Users/oleg/winjax/toolchains/cuda_repos/cuda_cudnn
+common:winjax_cuda --override_repository=cuda_cufft=C:/Users/oleg/winjax/toolchains/cuda_repos/cuda_cufft
+common:winjax_cuda --override_repository=cuda_curand=C:/Users/oleg/winjax/toolchains/cuda_repos/cuda_curand
+common:winjax_cuda --override_repository=cuda_cusolver=C:/Users/oleg/winjax/toolchains/cuda_repos/cuda_cusolver
+common:winjax_cuda --override_repository=cuda_cusparse=C:/Users/oleg/winjax/toolchains/cuda_repos/cuda_cusparse
+common:winjax_cuda --override_repository=cuda_nvrtc=C:/Users/oleg/winjax/toolchains/cuda_repos/cuda_nvrtc
+common:winjax_cuda --override_repository=cuda_nvjitlink=C:/Users/oleg/winjax/toolchains/cuda_repos/cuda_nvjitlink
+common:winjax_cuda --override_repository=cuda_nvcc=C:/Users/oleg/winjax/toolchains/cuda_repos/cuda_nvcc
+common:winjax_cuda --override_repository=cuda_nvvm=C:/Users/oleg/winjax/toolchains/cuda_repos/cuda_nvvm
+common:winjax_cuda --override_repository=cuda_nvdisasm=C:/Users/oleg/winjax/toolchains/cuda_repos/cuda_nvdisasm
+common:winjax_cuda --override_repository=cuda_nvptxcompiler=C:/Users/oleg/winjax/toolchains/cuda_repos/cuda_nvptxcompiler
+common:winjax_cuda --override_repository=cuda_cupti=C:/Users/oleg/winjax/toolchains/cuda_repos/cuda_cupti
+common:winjax_cuda --override_repository=cuda_nvml=C:/Users/oleg/winjax/toolchains/cuda_repos/cuda_nvml
+common:winjax_cuda --override_repository=cuda_nvtx=C:/Users/oleg/winjax/toolchains/cuda_repos/cuda_nvtx
+common:winjax_cuda --override_repository=cuda_profiler_api=C:/Users/oleg/winjax/toolchains/cuda_repos/cuda_profiler_api
+
+# CUDA on, clang as the CUDA compiler, link real import libs (no ELF stubs).
+common:winjax_cuda --@local_config_cuda//:enable_cuda
+common:winjax_cuda --@local_config_cuda//:cuda_compiler=clang
+common:winjax_cuda --@local_config_cuda//cuda:include_cuda_libs=true
+common:winjax_cuda --define=no_nccl_support=true

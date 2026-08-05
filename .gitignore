@@ -1,0 +1,31 @@
+# Ignore everything by default; opt paths in explicitly below.
+# Ignored (not repo material): jax/ (unmodified clone, build workspace),
+# xla/ (its own git repo, branch "winjax"), tools/ (downloaded toolchains),
+# .venv/, downloaded archives, logs.
+/*
+
+# Tracked top-level files
+!/.gitignore
+!/README.md
+
+# Exported patch series for Bazel external repos
+!/patches/
+
+# Loader package source (jax_plugins/winjax_cuda)
+!/winjax/
+
+# Hand-authored toolchain override repos
+!/toolchains/
+# ...except machine-generated / unpacked content:
+/toolchains/cccl_patched/
+/toolchains/cudnn/
+# cuda_repos: keep only the Bazel repo definition files. The include/lib/bin/
+# nvvm/... subdirs are machine-generated NTFS junctions into tools/ and must
+# never be committed (git would recurse into them and add the CUDA SDK).
+/toolchains/cuda_repos/*/*
+!/toolchains/cuda_repos/*/BUILD
+!/toolchains/cuda_repos/*/WORKSPACE
+!/toolchains/cuda_repos/*/version.bzl
+
+# Logs anywhere
+*.log

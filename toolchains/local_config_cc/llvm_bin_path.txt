@@ -1,0 +1,4 @@
+C:\Users\oleg\winjax\tools\llvm22\bin
+C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3
+sm_120
+C:\Users\oleg\winjax\toolchains\cccl_patched

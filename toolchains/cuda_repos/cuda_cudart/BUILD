@@ -1,0 +1,159 @@
+load("@rules_cc//cc:defs.bzl", "cc_import", "cc_library")
+
+licenses(["restricted"])  # NVIDIA proprietary license
+
+exports_files([
+    "include/cuda.h",
+])
+
+filegroup(
+    name = "static",
+    srcs = ["lib/cudart_static.lib"],
+    visibility = ["@local_config_cuda//cuda:__pkg__"],
+)
+
+cc_import(
+    name = "cuda_stub",
+    interface_library = "lib/cuda.lib",
+    system_provided = 1,
+)
+
+cc_import(
+    name = "cudart_shared_library",
+    hdrs = [":headers"],
+    interface_library = "lib/cudart.lib",
+    system_provided = 1,
+)
+
+cc_import(
+    name = "cudart_static_library",
+    hdrs = [":headers"],
+    static_library = "lib/cudart_static.lib",
+)
+
+# culibos does not exist on Windows; keep the target name with no library.
+cc_import(
+    name = "culibos_static_library",
+    hdrs = [":headers"],
+)
+
+cc_import(
+    name = "cudadevrt_static_library",
+    hdrs = [":headers"],
+    static_library = "lib/cudadevrt.lib",
+)
+
+cc_library(
+    name = "cuda_driver",
+    deps = [":cuda_stub"],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "cudart",
+    deps = select({
+        "@cuda_driver//:cuda_umd_libs": [
+            "@cuda_driver//:nvidia_driver",
+            "@cuda_driver//:nvidia_ptxjitcompiler",
+        ],
+        "//conditions:default": [":cuda_driver"],
+    }) + [":cudart_shared_library"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "header_list",
+    srcs = glob([
+        "include/builtin_types.h",
+        "include/channel_descriptor.h",
+        "include/common_functions.h",
+        "include/cooperative_groups/**",
+        "include/cooperative_groups.h",
+        "include/cuComplex.h",
+        "include/cuda.h",
+        "include/cudaEGL.h",
+        "include/cudaEGLTypedefs.h",
+        "include/cudaGL.h",
+        "include/cudaGLTypedefs.h",
+        "include/cudaProfilerTypedefs.h",
+        "include/cudaTypedefs.h",
+        "include/cudaVDPAU.h",
+        "include/cudaVDPAUTypedefs.h",
+        "include/cuda_awbarrier.h",
+        "include/cuda_awbarrier_helpers.h",
+        "include/cuda_awbarrier_primitives.h",
+        "include/cuda_bf16.h",
+        "include/cuda_bf16.hpp",
+        "include/cuda_device_runtime_api.h",
+        "include/cuda_egl_interop.h",
+        "include/cuda_fp16.h",
+        "include/cuda_fp16.hpp",
+        "include/cuda_fp4.h",
+        "include/cuda_fp4.hpp",
+        "include/cuda_fp6.h",
+        "include/cuda_fp6.hpp",
+        "include/cuda_fp8.h",
+        "include/cuda_fp8.hpp",
+        "include/cuda_gl_interop.h",
+        "include/cuda_occupancy.h",
+        "include/cuda_pipeline.h",
+        "include/cuda_pipeline_helpers.h",
+        "include/cuda_pipeline_primitives.h",
+        "include/cuda_runtime.h",
+        "include/cuda_runtime_api.h",
+        "include/cuda_surface_types.h",
+        "include/cuda_texture_types.h",
+        "include/cuda_vdpau_interop.h",
+        "include/cudart_platform.h",
+        "include/device_atomic_functions.h",
+        "include/device_atomic_functions.hpp",
+        "include/device_double_functions.h",
+        "include/device_functions.h",
+        "include/device_launch_parameters.h",
+        "include/device_types.h",
+        "include/driver_functions.h",
+        "include/driver_types.h",
+        "include/host_config.h",
+        "include/host_defines.h",
+        "include/library_types.h",
+        "include/math_constants.h",
+        "include/math_functions.h",
+        "include/mma.h",
+        "include/nvfunctional",
+        "include/sm_20_atomic_functions.h",
+        "include/sm_20_atomic_functions.hpp",
+        "include/sm_20_intrinsics.h",
+        "include/sm_20_intrinsics.hpp",
+        "include/sm_30_intrinsics.h",
+        "include/sm_30_intrinsics.hpp",
+        "include/sm_32_atomic_functions.h",
+        "include/sm_32_atomic_functions.hpp",
+        "include/sm_32_intrinsics.h",
+        "include/sm_32_intrinsics.hpp",
+        "include/sm_35_atomic_functions.h",
+        "include/sm_35_intrinsics.h",
+        "include/sm_60_atomic_functions.h",
+        "include/sm_60_atomic_functions.hpp",
+        "include/sm_61_intrinsics.h",
+        "include/sm_61_intrinsics.hpp",
+        "include/surface_functions.h",
+        "include/surface_indirect_functions.h",
+        "include/surface_types.h",
+        "include/texture_fetch_functions.h",
+        "include/texture_indirect_functions.h",
+        "include/texture_types.h",
+        "include/vector_functions.h",
+        "include/vector_functions.hpp",
+        "include/vector_types.h",
+    ]),
+    visibility = ["@local_config_cuda//cuda:__pkg__"],
+)
+
+cc_library(
+    name = "headers",
+    hdrs = [":header_list"],
+    include_prefix = "third_party/gpus/cuda/include",
+    includes = ["include"],
+    strip_include_prefix = "include",
+    visibility = ["@local_config_cuda//cuda:__pkg__"],
+)
