@@ -8,7 +8,8 @@ archive named in the defining workspace stanza **plus** XLA's own fetch-time
     git apply -p1 windows-port.patch
     patch -p1 -E < windows-port.patch   # -E so emptied files (VERSION) are deleted
 
-Pristine bases (all stanzas from xla @ cf227a88e7ba467855899e7293334fea8995ee25):
+Pristine bases (all stanzas identical in xla @ cf227a88e7ba467855899e7293334fea8995ee25
+and in xla @ 131bf41acb4650e4391a640c3f1859c1c86ad74b, the jax v0.11.0 pin):
 
 | repo                | base archive                                              | defined in |
 |---------------------|-----------------------------------------------------------|------------|

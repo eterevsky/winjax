@@ -1,5 +1,5 @@
-﻿diff --git a/jaxlib/gpu/hybrid_kernels.cc b/jaxlib/gpu/hybrid_kernels.cc
-index 78bce9750..cec43a24b 100644
+diff --git a/jaxlib/gpu/hybrid_kernels.cc b/jaxlib/gpu/hybrid_kernels.cc
+index 78bce9750f..cec43a24b2 100644
 --- a/jaxlib/gpu/hybrid_kernels.cc
 +++ b/jaxlib/gpu/hybrid_kernels.cc
 @@ -15,7 +15,9 @@ limitations under the License.
@@ -33,7 +33,7 @@ index 78bce9750..cec43a24b 100644
  // from a device buffer.
  template <typename T>
 diff --git a/jaxlib/mosaic/gpu/BUILD b/jaxlib/mosaic/gpu/BUILD
-index 500437ef4..2858ac9cb 100644
+index ed8bc19b0e..71d055fe5a 100644
 --- a/jaxlib/mosaic/gpu/BUILD
 +++ b/jaxlib/mosaic/gpu/BUILD
 @@ -35,10 +35,19 @@ cc_proto_library(
@@ -59,7 +59,7 @@ index 500437ef4..2858ac9cb 100644
  
  cc_library(
 diff --git a/jaxlib/tools/build_gpu_kernels_wheel.py b/jaxlib/tools/build_gpu_kernels_wheel.py
-index 47e846910..3b0b9aed0 100644
+index 47e8469108..3b0b9aed01 100644
 --- a/jaxlib/tools/build_gpu_kernels_wheel.py
 +++ b/jaxlib/tools/build_gpu_kernels_wheel.py
 @@ -82,6 +82,52 @@ if args.enable_cuda and not args.nvidia_wheel_versions_data:
@@ -149,7 +149,7 @@ index 47e846910..3b0b9aed0 100644
        ],
    )
 diff --git a/jaxlib/tridiagonal_solve_perturbed.h b/jaxlib/tridiagonal_solve_perturbed.h
-index 2fc074c0e..60f2634d2 100644
+index 2fc074c0ec..60f2634d2e 100644
 --- a/jaxlib/tridiagonal_solve_perturbed.h
 +++ b/jaxlib/tridiagonal_solve_perturbed.h
 @@ -61,6 +61,25 @@ struct NumTraits<::cuda::std::complex<double>>

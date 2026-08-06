@@ -36,8 +36,10 @@ JAX** as an out-of-tree plugin. No WSL.
   Bazel fetches. See `patches/README.md`.
 - `winjax/jax_plugins/winjax_cuda/` — the loader package installed into the
   venv's `site-packages`. It registers the plugin with JAX.
-- `xla/` (ignored; its own repo) — XLA clone, branch `winjax` on top of pinned
-  commit `cf227a88e7ba467855899e7293334fea8995ee25`, carrying the Windows-port
+- `xla/` (ignored; its own repo) — XLA clone; branch `winjax-0.11.0` on top of
+  `131bf41acb4650e4391a640c3f1859c1c86ad74b` (the jax v0.11.0 XLA pin) is the
+  current build branch (branch `winjax` is the same series on the older
+  `cf227a88e7ba467855899e7293334fea8995ee25`), carrying the Windows-port
   commits (build files, PJRT plugin loading, stream_executor fixes, ...).
 - `jax/` (ignored) — unmodified JAX clone, used only as the Bazel build
   workspace for the plugin target.

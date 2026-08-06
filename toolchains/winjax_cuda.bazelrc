@@ -30,4 +30,7 @@ common:winjax_cuda --override_repository=cuda_profiler_api=C:/Users/oleg/winjax/
 common:winjax_cuda --@local_config_cuda//:enable_cuda
 common:winjax_cuda --@local_config_cuda//:cuda_compiler=clang
 common:winjax_cuda --@local_config_cuda//cuda:include_cuda_libs=true
+# jax 0.11.0's wheel rule refuses direct CUDA-library linkage without this
+# acknowledgement (we intentionally link real import libs, not dlopen stubs).
+common:winjax_cuda --@local_config_cuda//cuda:override_include_cuda_libs=true
 common:winjax_cuda --define=no_nccl_support=true

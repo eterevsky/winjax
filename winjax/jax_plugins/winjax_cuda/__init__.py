@@ -11,8 +11,7 @@ import sys
 
 _CUDA_ROOT = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3"
 _CUDNN_BIN = r"C:\Users\oleg\winjax\toolchains\cudnn\unpacked\nvidia\cudnn\bin"
-_PLUGIN = (r"C:\users\oleg\_bazel_oleg\t4poymkv\execroot\__main__\bazel-out"
-           r"\x64_windows-opt\bin\external\xla\xla\pjrt\c\pjrt_c_api_gpu_plugin.so")
+_PLUGIN = r"C:\Users\oleg\winjax\dist\pjrt_c_api_gpu_plugin.so"
 
 _DLL_DIRS = [
     os.path.join(_CUDA_ROOT, "bin", "x64"),
