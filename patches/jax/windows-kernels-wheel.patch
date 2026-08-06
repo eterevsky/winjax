@@ -1,0 +1,206 @@
+﻿diff --git a/jaxlib/gpu/hybrid_kernels.cc b/jaxlib/gpu/hybrid_kernels.cc
+index 78bce9750..cec43a24b 100644
+--- a/jaxlib/gpu/hybrid_kernels.cc
++++ b/jaxlib/gpu/hybrid_kernels.cc
+@@ -15,7 +15,9 @@ limitations under the License.
+ 
+ #include "jaxlib/gpu/hybrid_kernels.h"
+ 
++#ifndef _WIN32
+ #include <dlfcn.h>
++#endif
+ 
+ #include <algorithm>
+ #include <cstddef>
+@@ -47,6 +49,19 @@ namespace JAX_GPU_NAMESPACE {
+ 
+ namespace ffi = ::xla::ffi;
+ 
++#ifdef _WIN32
++// TODO(winjax): MAGMA is loaded with dlopen on POSIX. There is no dynamic
++// MAGMA loading support on Windows yet, so these stubs make the MAGMA lookup
++// always fail and the hybrid kernels fall back to the LAPACK host
++// implementations (magma == "auto"), or return a clear error (magma == "on").
++namespace {
++constexpr int RTLD_LAZY = 0;
++inline void* dlopen(const char*, int) { return nullptr; }
++inline void* dlsym(void*, const char*) { return nullptr; }
++inline int dlclose(void*) { return 0; }
++}  // namespace
++#endif  // _WIN32
++
+ // This helper class is used to define a host buffer that can be copied to and
+ // from a device buffer.
+ template <typename T>
+diff --git a/jaxlib/mosaic/gpu/BUILD b/jaxlib/mosaic/gpu/BUILD
+index 500437ef4..2858ac9cb 100644
+--- a/jaxlib/mosaic/gpu/BUILD
++++ b/jaxlib/mosaic/gpu/BUILD
+@@ -35,10 +35,19 @@ cc_proto_library(
+     deps = [":mosaic_gpu_proto"],
+ )
+ 
++# winjax: Mosaic GPU has POSIX-only code (unistd.h, dlfcn.h, GNU ld version
++# scripts), so it is excluded from the Windows wheel for now. Pallas/Mosaic GPU
++# is not supported on Windows yet.
+ py_library(
+     name = "mosaic_gpu",
+-    data = [":libmosaic_gpu_runtime.so"],
+-    deps = [":_mosaic_gpu_ext"],
++    data = select({
++        "@platforms//os:windows": [],
++        "//conditions:default": [":libmosaic_gpu_runtime.so"],
++    }),
++    deps = select({
++        "@platforms//os:windows": [],
++        "//conditions:default": [":_mosaic_gpu_ext"],
++    }),
+ )
+ 
+ cc_library(
+diff --git a/jaxlib/tools/build_gpu_kernels_wheel.py b/jaxlib/tools/build_gpu_kernels_wheel.py
+index 47e846910..3b0b9aed0 100644
+--- a/jaxlib/tools/build_gpu_kernels_wheel.py
++++ b/jaxlib/tools/build_gpu_kernels_wheel.py
+@@ -82,6 +82,52 @@ if args.enable_cuda and not args.nvidia_wheel_versions_data:
+ r = runfiles.Create()
+ pyext = "pyd" if build_utils.is_windows() else "so"
+ 
++# winjax: on Windows the kernel extension modules link real CUDA import
++# libraries (there is no RPATH), and Python >= 3.8 does not consult PATH when
++# resolving extension-module DLL dependencies. Register the CUDA DLL
++# directories at package import time, before any of the .pyd submodules are
++# loaded (jaxlib imports them during `import jax`, ahead of PJRT plugin
++# initialization).
++_WIN_CUDA_INIT_PY = '''\
++"""jax_cuda13_plugin: winjax Windows build.
++
++Registers CUDA DLL directories so the kernel extension modules (.pyd) in this
++package can resolve their CUDA library dependencies at import time.
++"""
++
++import glob as _glob
++import os as _os
++
++
++def _add_cuda_dll_dirs():
++  dirs = []
++  for env in ("CUDA_ROOT", "CUDA_PATH"):
++    root = _os.environ.get(env)
++    if root:
++      dirs += [
++          _os.path.join(root, "bin", "x64"),
++          _os.path.join(root, "bin"),
++          _os.path.join(root, "extras", "CUPTI", "lib64"),
++      ]
++  for env in ("CUDNN_PATH", "CUDNN_HOME"):
++    root = _os.environ.get(env)
++    if root:
++      dirs += [_os.path.join(root, "bin"), root]
++  # NVIDIA pip wheels installed next to this package (site-packages/nvidia).
++  site_dir = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
++  dirs += sorted(_glob.glob(_os.path.join(site_dir, "nvidia", "*", "bin")))
++  for d in dirs:
++    if _os.path.isdir(d):
++      try:
++        _os.add_dll_directory(d)
++      except (OSError, AttributeError):
++        pass
++
++
++if _os.name == "nt":
++  _add_cuda_dll_dirs()
++'''
++
+ 
+ def write_setup_cfg(sources_path, cpu):
+   tag = build_utils.platform_tag(cpu)
+@@ -135,7 +181,19 @@ def prepare_wheel_cuda(
+ 
+   plugin_dir = wheel_sources_path / f"jax_cuda{cuda_version}_plugin"
+   plugin_dir.mkdir(parents=True, exist_ok=True)
+-  (plugin_dir / "__init__.py").touch()
++  if build_utils.is_windows():
++    (plugin_dir / "__init__.py").write_text(_WIN_CUDA_INIT_PY)
++  else:
++    (plugin_dir / "__init__.py").touch()
++  # winjax: Mosaic GPU is not built on Windows (POSIX-only code), so the
++  # mosaic extension and runtime library are excluded from the Windows wheel.
++  if build_utils.is_windows():
++    mosaic_srcs = []
++  else:
++    mosaic_srcs = [
++        f"{source_file_prefix}jaxlib/mosaic/gpu/_mosaic_gpu_ext.{pyext}",
++        f"{source_file_prefix}jaxlib/mosaic/gpu/libmosaic_gpu_runtime.so",
++    ]
+   copy_files(
+       dst_dir=plugin_dir,
+       src_files=[
+@@ -148,8 +206,9 @@ def prepare_wheel_cuda(
+           f"{source_file_prefix}jaxlib/cuda/_hybrid.{pyext}",
+           f"{source_file_prefix}jaxlib/cuda/_versions.{pyext}",
+           f"{source_file_prefix}jaxlib/cuda/cuda_plugin_extension.{pyext}",
+-          f"{source_file_prefix}jaxlib/mosaic/gpu/_mosaic_gpu_ext.{pyext}",
+-          f"{source_file_prefix}jaxlib/mosaic/gpu/libmosaic_gpu_runtime.so",
++      ]
++      + mosaic_srcs
++      + [
+           f"{source_file_prefix}jaxlib/version.py",
+       ],
+   )
+diff --git a/jaxlib/tridiagonal_solve_perturbed.h b/jaxlib/tridiagonal_solve_perturbed.h
+index 2fc074c0e..60f2634d2 100644
+--- a/jaxlib/tridiagonal_solve_perturbed.h
++++ b/jaxlib/tridiagonal_solve_perturbed.h
+@@ -61,6 +61,25 @@ struct NumTraits<::cuda::std::complex<double>>
+ 
+ namespace jax {
+ 
++// winjax: MSVC's ucrt declares the float C++ overload of copysign as a
++// host-only `static __inline` function, which the clang CUDA device pass
++// cannot emit code for (ptxas: unresolved '_ZL8copysignff'). Route through
++// the C99 functions, which have __device__ overloads in clang's CUDA math
++// wrappers.
++#ifdef _WIN32
++EIGEN_DEVICE_FUNC inline float CopySign(float a, float b) {
++  return ::copysignf(a, b);
++}
++EIGEN_DEVICE_FUNC inline double CopySign(double a, double b) {
++  return ::copysign(a, b);
++}
++#else
++template <typename T>
++EIGEN_DEVICE_FUNC inline T CopySign(T a, T b) {
++  return std::copysign(a, b);
++}
++#endif
++
+ // Adjust pivot such that neither 'rhs[i,:] / pivot' nor '1 / pivot' cause
+ // overflow, where i numerates the multiple right-hand-sides. During the
+ // back-substitution phase in
+@@ -92,7 +111,7 @@ EIGEN_DEVICE_FUNC void MaybePerturbPivot(
+   // 'perturb' should never have magnitude smaller than safemin.
+   perturb = std::max(Eigen::numext::abs(perturb), safemin);
+   // Make sure perturb and pivot have the same sign.
+-  perturb = std::copysign(perturb, real(pivot));
++  perturb = CopySign(perturb, real(pivot));
+ 
+   bool stop = false;
+   const RealScalar max_factor = rhs_row.derived().array().abs().maxCoeff();
+@@ -268,14 +287,14 @@ SolveWithGaussianEliminationWithPivotingAndPerturbSingular(
+   if (n > 1) {
+     p = u(n - 2, 0);
+     rhs_row = x.row(n - 2) - u(n - 2, 1) * x.row(n - 1);
+-    MaybePerturbPivot(std::copysign(perturb, real(p)), p, rhs_row);
++    MaybePerturbPivot(CopySign(perturb, real(p)), p, rhs_row);
+     x.row(n - 2) = rhs_row * (Scalar(1.0) / p);
+   }
+ 
+   for (int k = n - 3; k >= 0; --k) {
+     p = u(k, 0);
+     rhs_row = x.row(k) - u(k, 1) * x.row(k + 1) - u(k, 2) * x.row(k + 2);
+-    MaybePerturbPivot(std::copysign(perturb, real(p)), p, rhs_row);
++    MaybePerturbPivot(CopySign(perturb, real(p)), p, rhs_row);
+     x.row(k) = rhs_row * (Scalar(1.0) / p);
+   }
+ }

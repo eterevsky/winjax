@@ -19,6 +19,7 @@ Pristine bases (all stanzas from xla @ cf227a88e7ba467855899e7293334fea8995ee25)
 | com_google_absl     | abseil-cpp 20260526.0                                     | `xla/third_party/absl/workspace.bzl` |
 | com_google_protobuf | protobuf v6.31.1 (NOT the 34.1 in `workspace2.bzl`; that `maybe()` is a no-op) | `xla/third_party/py/python_init_rules.bzl` |
 | local_config_rocm   | machine-generated repo — full-file override, see its README | `rocm_configure` |
+| eigen_archive       | eigen mirror archive pinned by `xla/third_party/eigen3/workspace.bzl` | `xla/third_party/eigen3/workspace.bzl` |
 
 Summary of changes:
 
@@ -36,3 +37,7 @@ Summary of changes:
   `__declspec(thread)` in the `__CUDA_ARCH__` (device) compilation pass.
 - **local_config_rocm** — `if_gpu_is_configured` / `if_cuda_or_rocm` keyed on
   `@local_config_cuda//:is_cuda_enabled` (override file, not a patch).
+- **eigen_archive** — `Fill.h`: `eigen_zero_impl<..., use_memset=true>` calls
+  host-only `memset` in the clang-CUDA device pass; route to the
+  assignment-loop impl under `EIGEN_GPU_COMPILE_PHASE` (mirrors the existing
+  `eigen_fill_impl` guard; upstream-worthy).
