@@ -13,7 +13,7 @@ import time
 
 JAX = r"C:\Users\oleg\winjax\jax"
 PY = r"C:\Users\oleg\winjax\.venv\Scripts\python.exe"
-LOGS = r"C:\Users\oleg\winjax\test_logs"
+LOGS = os.environ.get("SWEEP_LOGS", r"C:\Users\oleg\winjax\test_logs")
 PER_FILE_TIMEOUT = 100 * 60  # seconds
 
 # Multi-process / multi-GPU / distributed / mock-GPU / mosaic (not in the
