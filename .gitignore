@@ -35,3 +35,7 @@
 
 # Logs anywhere
 *.log
+
+hugging_face.txt
+hf_token.txt
+testpypi.txt
