@@ -15,7 +15,7 @@ import sys
 import zipfile
 
 NAME = "winjax_cuda13_pjrt"
-VERSION = "0.11.0"
+VERSION = "0.11.0.post1"
 TAG = "py3-none-win_amd64"
 
 METADATA = f"""\
@@ -30,7 +30,7 @@ License: Apache-2.0
 Classifier: Development Status :: 3 - Alpha
 Classifier: Environment :: GPU :: NVIDIA CUDA :: 13
 Classifier: Operating System :: Microsoft :: Windows
-Requires-Python: >=3.13,<3.14
+Requires-Python: >=3.13,<3.15
 """
 
 WHEEL = f"""\

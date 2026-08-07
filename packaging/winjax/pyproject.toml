@@ -8,7 +8,7 @@ version = "0.11.0"
 description = "Native Windows CUDA support for JAX (unofficial PJRT plugin loader)"
 readme = "README.md"
 license = "Apache-2.0"
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.13,<3.15"
 authors = [{ name = "Oleg Eterevsky", email = "oleg@eterevsky.com" }]
 classifiers = [
     "Development Status :: 3 - Alpha",
