@@ -1,67 +1,135 @@
 # winjax
 
-A native Windows CUDA backend for JAX: the XLA GPU PJRT plugin, built on
-Windows with clang-cl against the standard CUDA toolkit, loaded into **stock
-JAX** as an out-of-tree plugin. No WSL.
+Native Windows CUDA backend for [JAX](https://github.com/jax-ml/jax) — no WSL.
+
+winjax builds XLA's GPU PJRT plugin as a native Windows DLL and loads it into
+**stock JAX** as an out-of-tree plugin. `jit`, `grad`, convolutions (cuDNN),
+matmuls (cuBLAS), linear algebra (cuSOLVER), and XLA's runtime kernel JIT all
+run natively on your GPU.
+
+## Installation
+
+```
+pip install winjax
+```
+
+That's it. The package depends on `jax`/`jaxlib` (official wheels) and pulls
+the entire CUDA userland — cuDNN, cuBLAS, cuFFT, CUPTI, NVRTC, `ptxas`,
+`libdevice` — from NVIDIA's own pip wheels. No CUDA toolkit installation, no
+cuDNN download, no environment variables.
+
+> Until the first production PyPI release lands, install the verified preview
+> from TestPyPI:
+> `pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ winjax`
+
+### Requirements
+
+- **Windows 10/11 x64**
+- **An NVIDIA GPU and a current NVIDIA driver** — the only system
+  dependency (the driver provides `nvcuda.dll`; everything else comes from
+  pip). CUDA 13-era drivers recommended.
+- **Python 3.13 or 3.14** (64-bit)
+
+On machines without an NVIDIA GPU or driver, `import jax` silently falls back
+to the normal CPU backend — winjax stays out of the way.
+
+### Verify
+
+```python
+import jax
+import jax.numpy as jnp
+
+print(jax.devices())            # [CudaDevice(id=0)]
+x = jnp.ones((4096, 4096))
+print((x @ x)[0, 0])            # runs on the GPU
+```
 
 ## Status
 
-- The GPU plugin (`pjrt_c_api_gpu_plugin.so`, a DLL despite the name) builds
-  and runs natively on Windows (RTX 5090, CUDA 13.x).
-- First light verified: JAX picks up the `cuda` platform through the
-  `jax_plugins.winjax_cuda` loader and runs computations on the GPU.
-- cuDNN is not yet linked into the plugin (convolution autotuning falls back
-  gracefully; see the XLA `winjax` branch commits).
+- Each winjax release is pinned to a specific `jax`/`jaxlib` release
+  (currently **0.11.0**) — `pip install winjax` brings the matching pair.
+- **JAX's own test suite passes** against this backend: ~36,400 tests,
+  0 failures across 155 test files on an RTX 5090 (see `KNOWN_ISSUES.md`
+  for watch items).
+- Verified coexistence with PyTorch's bundled cuDNN in the same process
+  (winjax preloads its cuDNN privately instead of mutating `PATH`).
 
-## Layout
+### Limitations
 
-- `toolchains/` — our hand-authored Bazel override repositories:
-  - `winjax_cuda.bazelrc` — the entry point: `--bazelrc=... --config=winjax_cuda`.
-    Overrides `local_config_cc`, `local_config_cuda`, `xla`, and every
-    `cuda_*` redistrib repo with the local Windows equivalents.
-  - `local_config_cc/` — CC toolchain with the winjax compiler wrapper
-    (`winjax_cc_wrapper.py` / `winjax_cl.bat`), driving clang-cl for host and
-    clang for CUDA device code.
-  - `local_config_cuda_win/` — Windows replacement for XLA's Linux-only
-    hermetic CUDA configuration.
-  - `cuda_repos/<name>/` — one tiny Bazel repo per CUDA component (cudart,
-    cublas, nvrtc, ...). Only `BUILD`, `WORKSPACE` and `version.bzl` are
-    tracked; the `include`/`lib`/`bin` subdirs are machine-generated NTFS
-    junctions into the locally installed toolkit / `tools/` and are ignored.
-  - `cccl_patched/`, `cudnn/` — machine-local unpacked content, ignored.
-- `patches/` — exported Windows-port patch series for Bazel *external*
-  repositories that had to be modified (triton, rmm, raft, rapids_logger,
-  abseil, protobuf, local_config_rocm). Each patch applies with
-  `patch -p1 -E` / `git apply` from the external repo root, on top of what
-  Bazel fetches. See `patches/README.md`.
-- `winjax/jax_plugins/winjax_cuda/` — the loader package installed into the
-  venv's `site-packages`. It registers the plugin with JAX.
-- `xla/` (ignored; its own repo) — XLA clone; branch `winjax-0.11.0` on top of
-  `131bf41acb4650e4391a640c3f1859c1c86ad74b` (the jax v0.11.0 XLA pin) is the
-  current build branch (branch `winjax` is the same series on the older
-  `cf227a88e7ba467855899e7293334fea8995ee25`), carrying the Windows-port
-  commits (build files, PJRT plugin loading, stream_executor fixes, ...).
-- `jax/` (ignored) — unmodified JAX clone, used only as the Bazel build
-  workspace for the plugin target.
-- `tools/`, `.venv/` (ignored) — downloaded toolchains (msys64, clang, ...)
-  and the Python environment.
+- **Single GPU.** NCCL does not exist on Windows; multi-GPU collectives and
+  distributed execution are out of scope.
+- **No Pallas / Mosaic GPU** (POSIX-only for now; excluded from the wheels).
+- Python 3.13/3.14 only, matching the official Windows `jaxlib` wheels.
+- The GPU runs in WDDM mode (display driver); very long individual kernels
+  can hit Windows' GPU watchdog on display GPUs.
 
 ## How it works
 
-1. **Build**: from the `jax/` workspace, Bazel builds
-   `@xla//xla/pjrt/c:pjrt_c_api_gpu_plugin.so` with
-   `--bazelrc=toolchains/winjax_cuda.bazelrc --config=winjax_cuda`.
-   - The bazelrc points Bazel at our override repos instead of XLA's
-     Linux-only hermetic CUDA rules, and at the local `xla/` checkout.
-   - The compiler wrapper in `local_config_cc` presents a clang-cl/clang
-     toolchain that can compile both MSVC-flavoured host code and CUDA
-     device code, linking real CUDA import libraries instead of Linux ELF
-     dlopen stubs.
-   - A handful of Bazel external repos need Windows fixes that cannot be
-     expressed as overrides; those are applied in place and captured as the
-     patch series in `patches/`.
-2. **Load**: `jax_plugins/winjax_cuda/__init__.py` (installed into
-   site-packages) side-steps jaxlib's not-yet-implemented Windows dlopen
-   path: it pre-loads the CUDA/cuDNN DLL directories, loads the plugin DLL
-   with `ctypes`, wraps `GetPjrtApi()` in a PyCapsule and registers it via
-   `jax._src.xla_bridge.register_plugin("cuda", ...)`.
+Three wheels:
+
+| Package | Contents |
+|---|---|
+| `winjax` | Pure-Python loader (`jax_plugins/winjax_cuda`); depends on everything else |
+| `winjax-cuda13-pjrt` | The XLA GPU compiler + runtime as one PJRT plugin DLL |
+| `winjax-cuda13-plugin` | The CUDA kernel extension modules (cuSOLVER/RNG/sparse FFI), import name `jax_cuda13_plugin` |
+
+At `import jax`, plugin discovery calls the loader's `initialize()`: it probes
+for an NVIDIA driver, registers the CUDA DLL directories from the `nvidia-*`
+wheels, preloads cuDNN by absolute path (no global `PATH` mutation), loads the
+plugin DLL via `ctypes`, and hands JAX the `PJRT_Api*` as a PyCapsule via
+`jax._src.xla_bridge.register_plugin("cuda", ...)` — bypassing jaxlib's
+not-yet-implemented Windows dlopen path. No fork of JAX, no patched jaxlib.
+
+**Build side**: the plugin is built with Bazel from the pinned jax release's
+XLA revision plus a Windows-port patch series
+([eterevsky/xla](https://github.com/eterevsky/xla), branch `winjax-0.11.0`).
+A compiler-dispatch wrapper presents one toolchain that compiles MSVC-flavored
+host code with clang-cl and CUDA device code with clang's CUDA driver
+(sm_120 / Blackwell targeted); hand-authored Bazel override repositories
+replace XLA's Linux-only hermetic CUDA rules with the local CUDA toolkit and
+generated cuDNN import libraries.
+
+## Repository layout
+
+- `packaging/` — the three wheel sources (`winjax`, `winjax_cuda13_pjrt`,
+  `winjax_cuda13_plugin`); `packaging/dist-release/` holds the current
+  production wheel set.
+- `toolchains/` — Bazel override repositories and the compiler wrapper:
+  `winjax_cuda.bazelrc` (entry point), `local_config_cc/` (CC toolchain +
+  `winjax_cc_wrapper.py`), `local_config_cuda_win/`, `cuda_repos/<name>/`
+  (one tiny repo per CUDA component; junction dirs are machine-generated and
+  ignored).
+- `patches/` — Windows-port patch series for Bazel external repositories
+  (triton, rmm, raft, rapids_logger, abseil, protobuf, eigen, jax,
+  local_config_rocm). Apply with `git apply` / `patch -p1 -E`; see
+  `patches/README.md`.
+- `winjax/` — the loader package source.
+- `build/` — build & test-sweep drivers.
+- `xla/`, `jax/`, `tools/`, `.venv*/` (ignored) — the XLA checkout (own
+  repo/fork), the unmodified JAX build workspace, downloaded toolchains, and
+  Python environments.
+
+## Building from source
+
+You need VS2022 (MSVC + Windows SDK), LLVM/clang ≥ 19, a CUDA 13.x toolkit,
+MSYS2 (`patch`), and Bazelisk. From the `jax/` checkout at the pinned release
+tag:
+
+```
+bazel --bazelrc=../toolchains/winjax_cuda.bazelrc build \
+    --config=win_clang --config=winjax_cuda \
+    @xla//xla/pjrt/c:pjrt_c_api_gpu_plugin.so \
+    //jaxlib/tools:jax_cuda13_plugin_wheel
+```
+
+A `configure.py` that regenerates the machine-specific toolchain snapshot is
+planned; until then the paths in `toolchains/` reflect the reference build
+machine.
+
+## Upstream
+
+Several fixes found during this port are being prepared as upstream
+contributions: an argument-evaluation-order bug and two MSVC-ABI overload
+traps in XLA, Windows `LoadPjrtPlugin` support, COFF weak-symbol handling for
+cuDNN/CUPTI, and a clang-version parsing bug in Bazel's Windows toolchain
+autoconfiguration.
