@@ -110,20 +110,182 @@ def initialize():
     for d in dll_dirs:
         os.add_dll_directory(d)
 
-    # cuDNN 9's modular sublibraries load each other with plain by-name
-    # LoadLibrary calls. Do NOT solve that by putting the cuDNN dir on PATH:
-    # that poisons other frameworks' bundled cuDNN (e.g. torch\lib) when jax
-    # is imported first. Instead preload our cuDNN DLLs by absolute path —
-    # the process module cache then satisfies by-name lookups for us, and
-    # other libraries' resolution is untouched.
+    # cuDNN policy: exactly ONE cuDNN 9.x family can serve a Windows
+    # process. The OS loader resolves modules by NAME process-wide (the
+    # first DLL loaded under a name serves every later by-name lookup),
+    # cuDNN's dispatcher loads its sublibraries (cudnn_graph, cudnn_cnn,
+    # engines, ...) with plain LoadLibrary — which ignores
+    # add_dll_directory — and the internal cross-DLL exports differ between
+    # 9.x minors, so members of two minors cannot bind to each other
+    # (WinError 127 / cudnn status 1008) in EITHER direction. On top of
+    # that, XLA requires the runtime cuDNN to be >= the version the plugin
+    # was compiled against (same major). Consequences:
+    #   * No cuDNN resident yet (jax imported first, or no torch): preload
+    #     OUR complete family by full path. Parts of it are already
+    #     resident anyway — the kernels wheel's .pyds statically import
+    #     cudnn sublibraries during "import jax" — so ours is the only
+    #     family the process can still complete consistently.
+    #   * A cuDNN main is already resident (torch eagerly loads its whole
+    #     bundled family at "import torch"): it cannot be displaced. Adopt
+    #     it when it is new enough for the plugin; otherwise warn that jax
+    #     cuDNN ops are unavailable (the GPU otherwise works).
+    # WINJAX_FORCE_OWN_CUDNN=1 skips adoption and always preloads ours.
+    # Never put a cuDNN dir on PATH: PATH is searched by torch's own DLL
+    # preloading and by cuDNN's sublibrary loads, and would cross-mix the
+    # families in other frameworks too.
     cudnn_dirs = [d for d in dll_dirs
                   if glob.glob(os.path.join(d, "cudnn*.dll"))]
-    for d in cudnn_dirs:
-        for dll in sorted(glob.glob(os.path.join(d, "cudnn*.dll"))):
+
+    def _cudnn_ver_str(v):
+        return f"{v // 10000}.{v % 10000 // 100}.{v % 100}"
+
+    def _compiled_cudnn_version():
+        """cuDNN version the plugin wheels were built against."""
+        for pkg in ("jax_cuda13_plugin", "jax_cuda12_plugin"):
+            try:
+                mod = importlib.import_module(pkg + "._versions")
+                return int(mod.cudnn_build_version())
+            except Exception:
+                continue
+        return 92400  # matches the shipped winjax-cuda13 wheels
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.GetModuleHandleW.restype = ctypes.c_void_p
+    kernel32.GetModuleHandleW.argtypes = [ctypes.c_wchar_p]
+    kernel32.GetModuleFileNameW.argtypes = [
+        ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_uint32]
+
+    def _resident_cudnn():
+        """(path, version) of the loaded cudnn64_9, else (None, None)."""
+        handle = kernel32.GetModuleHandleW("cudnn64_9.dll")
+        if not handle:
+            return None, None
+        buf = ctypes.create_unicode_buffer(2048)
+        kernel32.GetModuleFileNameW(handle, buf, 2048)
+        try:
+            dll = ctypes.WinDLL("cudnn64_9.dll")
+            dll.cudnnGetVersion.restype = ctypes.c_size_t
+            return buf.value, int(dll.cudnnGetVersion())
+        except (OSError, AttributeError):
+            return buf.value, None
+
+    def _preload_cudnn_family(directory):
+        """Loads every cudnn*.dll in directory by full path (best effort).
+
+        cuDNN 9 loads its sublibraries lazily by plain-LoadLibrary NAME
+        lookup; preloading the complete family is what makes those lookups
+        resolve — to one consistent family — without touching PATH.
+        """
+        for dll in sorted(glob.glob(os.path.join(directory, "cudnn*.dll"))):
             try:
                 ctypes.WinDLL(dll)
             except OSError:
-                pass
+                pass  # cross-family straggler; nothing actionable here
+
+    def _dll_file_version(path):
+        """cuDNN-style int version from a DLL's version resource, or None.
+
+        Reads the file on disk — does NOT load the DLL, so probing never
+        commits the process to a family.
+        """
+        try:
+            version = ctypes.WinDLL("version")
+            version.GetFileVersionInfoSizeW.argtypes = [
+                ctypes.c_wchar_p, ctypes.c_void_p]
+            version.GetFileVersionInfoW.argtypes = [
+                ctypes.c_wchar_p, ctypes.c_uint32, ctypes.c_uint32,
+                ctypes.c_void_p]
+            version.VerQueryValueW.argtypes = [
+                ctypes.c_void_p, ctypes.c_wchar_p,
+                ctypes.POINTER(ctypes.c_void_p),
+                ctypes.POINTER(ctypes.c_uint)]
+            size = version.GetFileVersionInfoSizeW(path, None)
+            if not size:
+                return None
+            data = ctypes.create_string_buffer(size)
+            if not version.GetFileVersionInfoW(path, 0, size, data):
+                return None
+            info = ctypes.c_void_p()
+            length = ctypes.c_uint()
+            if not version.VerQueryValueW(data, "\\", ctypes.byref(info),
+                                          ctypes.byref(length)):
+                return None
+            # VS_FIXEDFILEINFO: dwFileVersionMS/LS at offsets 8/12.
+            ms = ctypes.cast(info.value + 8,
+                             ctypes.POINTER(ctypes.c_uint32)).contents.value
+            ls = ctypes.cast(info.value + 12,
+                             ctypes.POINTER(ctypes.c_uint32)).contents.value
+            return (ms >> 16) * 10000 + (ms & 0xFFFF) * 100 + (ls >> 16)
+        except OSError:
+            return None
+
+    compiled_ver = _compiled_cudnn_version()
+    force_own = os.environ.get("WINJAX_FORCE_OWN_CUDNN") == "1"
+    resident_path, resident_ver = _resident_cudnn()
+    if resident_path is not None and not force_own:
+        if (resident_ver is not None
+                and resident_ver // 10000 == compiled_ver // 10000
+                and resident_ver >= compiled_ver):
+            # Adopt: complete the resident family so its lazily-loaded
+            # engine sublibraries resolve by name at first use.
+            _preload_cudnn_family(os.path.dirname(resident_path))
+        else:
+            _res = (_cudnn_ver_str(resident_ver)
+                    if resident_ver is not None else "of unknown version")
+            print(
+                f"winjax: cuDNN {_res} is already loaded ({resident_path}) "
+                f"but the winjax plugin was built against cuDNN "
+                f"{_cudnn_ver_str(compiled_ver)} and needs that version or "
+                "newer at runtime. jax cuDNN ops (convolution, attention, "
+                "...) will be UNAVAILABLE in this process; other GPU ops "
+                "still work. A Windows process can host only one cuDNN: "
+                "either upgrade the package that loaded it (usually torch) "
+                "to one bundling cuDNN >= "
+                f"{_cudnn_ver_str(compiled_ver)}, or keep jax and torch in "
+                "separate processes.", file=sys.stderr)
+    else:
+        if resident_path is not None:
+            print(
+                "winjax: WINJAX_FORCE_OWN_CUDNN=1, but cuDNN is already "
+                f"loaded ({resident_path}) and will keep serving this "
+                "process.", file=sys.stderr)
+        for d in cudnn_dirs:
+            _preload_cudnn_family(d)
+        main_path, main_ver = _resident_cudnn()
+        if main_ver is not None and main_ver < compiled_ver:
+            print(
+                f"winjax: the available cuDNN {_cudnn_ver_str(main_ver)} "
+                f"({main_path}) is older than the cuDNN "
+                f"{_cudnn_ver_str(compiled_ver)} the winjax plugin was "
+                "built against; jax cuDNN ops will be unavailable. "
+                "Upgrade with: pip install -U nvidia-cudnn-cu13",
+                file=sys.stderr)
+        # torch bundles its own cuDNN family and hard-loads every DLL in
+        # torch\lib at import; if that family differs from the one now
+        # resident, a later "import torch" in this process will fail.
+        # Probe torch's bundled version from the file's version resource
+        # (no DLL load) and give the user a heads-up in advance.
+        torch_main = None
+        torch_spec = importlib.util.find_spec("torch")
+        if torch_spec is not None:
+            for loc in (torch_spec.submodule_search_locations or []):
+                cand = os.path.join(loc, "lib", "cudnn64_9.dll")
+                if os.path.isfile(cand):
+                    torch_main = cand
+                    break
+        if torch_main is not None and main_ver is not None:
+            torch_ver = _dll_file_version(torch_main)
+            if torch_ver is not None and torch_ver != main_ver:
+                print(
+                    f"winjax: torch bundles cuDNN "
+                    f"{_cudnn_ver_str(torch_ver)} ({torch_main}) but this "
+                    f"process now runs cuDNN {_cudnn_ver_str(main_ver)}; a "
+                    "Windows process can host only one cuDNN, so importing "
+                    "torch here is likely to fail (WinError 127 on its "
+                    "cudnn DLLs). To combine torch and jax in one process, "
+                    "import torch FIRST: jax then uses torch's cuDNN if it "
+                    f"is >= {_cudnn_ver_str(compiled_ver)}, and runs "
+                    "without cuDNN ops otherwise.", file=sys.stderr)
 
     # XLA's ptxas/nvdisasm discovery consults PATH; those tool dirs are
     # harmless to other frameworks. Keep cuDNN dirs OFF PATH (see above).
