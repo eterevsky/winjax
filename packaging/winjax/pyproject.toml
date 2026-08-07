@@ -20,8 +20,8 @@ classifiers = [
 dependencies = [
     "jax==0.11.0",
     "jaxlib==0.11.0",
-    "winjax-cuda13-pjrt==0.11.0",
-    "winjax-cuda13-plugin==0.11.0",
+    "winjax-cuda13-pjrt==0.11.0.*",
+    "winjax-cuda13-plugin==0.11.0.*",
     # NVIDIA CUDA 13 runtime wheels (unsuffixed cu13 distribution names).
     # Upper bounds keep pip away from future major versions that may not
     # ship win_amd64 wheels.

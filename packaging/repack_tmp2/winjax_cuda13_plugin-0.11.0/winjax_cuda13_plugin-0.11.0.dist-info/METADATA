@@ -1,0 +1,40 @@
+Metadata-Version: 2.4
+Name: winjax-cuda13-plugin
+Version: 0.11.0
+Summary: JAX Plugin for NVIDIA GPUs
+Home-page: https://github.com/jax-ml/jax
+Author: JAX team
+Author-email: jax-dev@google.com
+License: Apache-2.0
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: 3.14
+Classifier: Programming Language :: Python :: Free Threading :: 3 - Stable
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+Requires-Dist: winjax-cuda13-pjrt==0.11.0.*
+Provides-Extra: with-cuda
+Requires-Dist: nvidia-cublas>=13.0.0.19; sys_platform == "linux" and extra == "with-cuda"
+Requires-Dist: nvidia-cuda-cupti>=13.0.48; sys_platform == "linux" and extra == "with-cuda"
+Requires-Dist: nvidia-cuda-nvcc>=13.0.48; sys_platform == "linux" and extra == "with-cuda"
+Requires-Dist: nvidia-cuda-runtime>=13.0.48; sys_platform == "linux" and extra == "with-cuda"
+Requires-Dist: nvidia-cudnn-cu13<10.0,>=9.12.0.46; sys_platform == "linux" and extra == "with-cuda"
+Requires-Dist: nvidia-cufft>=12.0.0.15; sys_platform == "linux" and extra == "with-cuda"
+Requires-Dist: nvidia-cusolver>=12.0.3.29; sys_platform == "linux" and extra == "with-cuda"
+Requires-Dist: nvidia-cusparse>=12.6.2.49; sys_platform == "linux" and extra == "with-cuda"
+Requires-Dist: nvidia-nccl-cu13>=2.27.7; sys_platform == "linux" and extra == "with-cuda"
+Requires-Dist: nvidia-nvjitlink>=13.0.39; sys_platform == "linux" and extra == "with-cuda"
+Requires-Dist: nvidia-cuda-nvrtc>=13.0.48; sys_platform == "linux" and extra == "with-cuda"
+Requires-Dist: nvidia-nvshmem-cu13>=3.3.20; sys_platform == "linux" and extra == "with-cuda"
+Requires-Dist: nvidia-nvvm; extra == "with-cuda"
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: license
+Dynamic: provides-extra
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
