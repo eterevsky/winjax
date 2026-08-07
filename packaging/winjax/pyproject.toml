@@ -26,11 +26,11 @@ dependencies = [
     # Upper bounds keep pip away from future major versions that may not
     # ship win_amd64 wheels.
     "nvidia-cublas>=13.0.0.19,<14",
-    "nvidia-cuda-cupti>=13.0.48,<14",
+    "nvidia-cuda-cupti>=13.3.75,<14",
     "nvidia-cuda-nvcc>=13.0.48,<14",
     "nvidia-cuda-nvrtc>=13.0.48,<14",
     "nvidia-cuda-runtime>=13.0.48,<14",
-    "nvidia-cudnn-cu13>=9.12.0.46,<10",
+    "nvidia-cudnn-cu13>=9.24.0.43,<10",
     "nvidia-cufft>=12.0.0.15,<13",
     "nvidia-cusolver>=12.0.3.29,<13",
     "nvidia-cusparse>=12.6.2.49,<13",

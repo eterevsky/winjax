@@ -93,6 +93,13 @@ def initialize():
     if sys.platform != "win32":
         return
 
+    # No NVIDIA driver -> no GPU. Bail out before registering anything so
+    # machines without a GPU fall back to jax's CPU backend silently.
+    try:
+        ctypes.WinDLL("nvcuda.dll")
+    except OSError:
+        return
+
     # Stock JAX's GPU presence check only knows Linux device nodes.
     from jax._src import hardware_utils
     hardware_utils.has_visible_nvidia_gpu = lambda: True
@@ -102,12 +109,28 @@ def initialize():
     dll_dirs = _cuda_dll_dirs()
     for d in dll_dirs:
         os.add_dll_directory(d)
-    # XLA's ptxas discovery consults PATH; cuDNN 9's modular sublibraries load
-    # each other via plain LoadLibrary, which searches PATH but ignores
-    # add_dll_directory — so all CUDA DLL dirs must be on PATH too.
-    if dll_dirs:
+
+    # cuDNN 9's modular sublibraries load each other with plain by-name
+    # LoadLibrary calls. Do NOT solve that by putting the cuDNN dir on PATH:
+    # that poisons other frameworks' bundled cuDNN (e.g. torch\lib) when jax
+    # is imported first. Instead preload our cuDNN DLLs by absolute path —
+    # the process module cache then satisfies by-name lookups for us, and
+    # other libraries' resolution is untouched.
+    cudnn_dirs = [d for d in dll_dirs
+                  if glob.glob(os.path.join(d, "cudnn*.dll"))]
+    for d in cudnn_dirs:
+        for dll in sorted(glob.glob(os.path.join(d, "cudnn*.dll"))):
+            try:
+                ctypes.WinDLL(dll)
+            except OSError:
+                pass
+
+    # XLA's ptxas/nvdisasm discovery consults PATH; those tool dirs are
+    # harmless to other frameworks. Keep cuDNN dirs OFF PATH (see above).
+    path_dirs = [d for d in dll_dirs if d not in cudnn_dirs]
+    if path_dirs:
         os.environ["PATH"] = os.pathsep.join(
-            dll_dirs + [os.environ.get("PATH", "")])
+            path_dirs + [os.environ.get("PATH", "")])
 
     cuda_root = _cuda_root()
     if cuda_root is not None:
@@ -127,7 +150,12 @@ def initialize():
             "winjax: pjrt_c_api_gpu_plugin.dll not found; is the "
             "winjax-cuda13-pjrt package installed?")
 
-    lib = ctypes.WinDLL(plugin_path)
+    try:
+        lib = ctypes.WinDLL(plugin_path)
+    except OSError as e:
+        print(f"winjax: failed to load {plugin_path}: {e}; "
+              "falling back to CPU.", file=sys.stderr)
+        return
     get_api = lib.GetPjrtApi
     get_api.restype = ctypes.c_void_p
     api_ptr = get_api()
