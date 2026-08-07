@@ -39,3 +39,6 @@
 hugging_face.txt
 hf_token.txt
 testpypi.txt
+
+!examples/
+!examples/**
