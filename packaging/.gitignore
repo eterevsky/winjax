@@ -1,0 +1,4 @@
+dist/
+build/
+*.egg-info/
+winjax_cuda13_plugin/build/

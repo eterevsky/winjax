@@ -16,6 +16,10 @@
 # Loader package source (jax_plugins/winjax_cuda)
 !/winjax/
 
+# Pip distribution sources/build scripts (winjax, winjax-cuda13-pjrt,
+# winjax-cuda13-plugin); built wheels excluded via packaging/.gitignore
+!/packaging/
+
 # Hand-authored toolchain override repos
 !/toolchains/
 # ...except machine-generated / unpacked content:
