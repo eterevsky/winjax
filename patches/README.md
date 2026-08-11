@@ -3,7 +3,19 @@
 Each `<repo>/windows-port.patch` contains ONLY the winjax Windows-port changes,
 diffed against the repository exactly as Bazel materializes it: the upstream
 archive named in the defining workspace stanza **plus** XLA's own fetch-time
-`patch_file` series. Apply from the external repo root with either:
+`patch_file` series.
+
+**Normal usage:** `python configure.py --patch-externals` (see BUILDING.md)
+materializes the external repos with an analysis-only Bazel run and applies
+every patch in this directory into `<output_base>/external/<repo>/`
+(idempotent; re-run after `bazel clean --expunge` or an XLA pin change).
+Special cases handled by that step: `local_config_rocm/` is a full-file
+override (see below), and `jax/` applies to the jax *checkout*, not an
+external repo (apply once at clone time: `git -C jax apply
+..\patches\jax\windows-kernels-wheel.patch`). `cccl/` patches the CUDA
+toolkit's CCCL headers into `toolchains/cccl_patched/` (see `cccl/README.md`).
+
+To apply manually from the external repo root:
 
     git apply -p1 windows-port.patch
     patch -p1 -E < windows-port.patch   # -E so emptied files (VERSION) are deleted
