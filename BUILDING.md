@@ -39,9 +39,26 @@ see `python configure.py --help`).
   `C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.x`. Override with
   `--cuda-path` or `CUDA_PATH`. Only headers/libs/`bin` tools are used at
   build time; end users get their CUDA userland from pip wheels.
-- **MSYS2** (e.g. `C:\msys64` or `<repo>\tools\msys64`), plus the `patch`
-  package: `pacman -S patch`. Bazel needs `bash.exe` (`BAZEL_SH`) for
-  genrules; `patch` is used when re-deriving patches.
+- **MSYS2** — the plain MSYS2 distribution from <https://www.msys2.org/>
+  (the official mirror of both the installer and the portable archive is
+  <https://github.com/msys2/msys2-installer/releases>). Do **not** use
+  MinGW-w64 standalone builds, Git-for-Windows' bundled MSYS, or Cygwin —
+  Bazel expects real MSYS2 (`usr\bin\bash.exe`). Two equally good options:
+  - *Portable (recommended, no admin, what the reference machine uses):*
+    download `msys2-base-x86_64-latest.tar.xz` from the releases page and
+    extract into the repo: `tar -xf msys2-base-x86_64-latest.tar.xz -C
+    <repo>\tools` (yields `<repo>\tools\msys64`, where `configure.py` finds
+    it automatically). Initialize once and install `patch`:
+    ```
+    <repo>\tools\msys64\usr\bin\bash.exe -lc "true"
+    <repo>\tools\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed patch coreutils"
+    ```
+  - *Installer:* run `msys2-x86_64-<date>.exe` (default `C:\msys64`), then in
+    the "MSYS2 MSYS" shell: `pacman -S --needed patch coreutils`.
+
+  No PATH changes are needed — `configure.py` locates `bash.exe` and wires it
+  via `BAZEL_SH` (Bazel needs it for genrules; `patch` is used when
+  re-deriving the CCCL patch series).
 - **Bazelisk** — download `bazelisk-windows-amd64.exe` and save it as
   `<repo>\tools\bazel.exe` (or have `bazel` on `PATH`). It fetches the Bazel
   version pinned by jax (7.x) automatically.
