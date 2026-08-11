@@ -7,7 +7,9 @@
 # Tracked top-level files
 !/.gitignore
 !/README.md
+!/BUILDING.md
 !/KNOWN_ISSUES.md
+!/configure.py
 !/run_test_sweep.py
 
 # Exported patch series for Bazel external repos
@@ -25,6 +27,19 @@
 # ...except machine-generated / unpacked content:
 /toolchains/cccl_patched/
 /toolchains/cudnn/
+# ...and the machine-specific files configure.py renders from
+# toolchains/templates/ (never commit absolute local paths):
+/toolchains/winjax_cuda.bazelrc
+/toolchains/winjax_env.bat
+/toolchains/local_config_cc/BUILD
+/toolchains/local_config_cc/winjax_cl.bat
+/toolchains/local_config_cc/get_env.bat
+/toolchains/local_config_cc/llvm_bin_path.txt
+/toolchains/local_config_cc/builtin_include_directory_paths_mingw
+/toolchains/local_config_cc/vc_installation_error_arm.bat
+/toolchains/local_config_cc/vc_installation_error_arm64.bat
+/toolchains/local_config_cuda_win/cuda/cuda/cuda_config.h
+/toolchains/local_config_cuda_win/cuda/cuda/cuda_config.py
 # cuda_repos: keep only the Bazel repo definition files. The include/lib/bin/
 # nvvm/... subdirs are machine-generated NTFS junctions into tools/ and must
 # never be committed (git would recurse into them and add the CUDA SDK).

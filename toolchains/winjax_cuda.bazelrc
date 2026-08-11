@@ -1,6 +1,7 @@
 # winjax: native Windows CUDA build configuration.
 # Usage: --bazelrc=this-file (startup option), then --config=winjax_cuda.
 # Hand-authored override repos replace the Linux-only hermetic CUDA repo rules.
+# Rendered from toolchains/templates/winjax_cuda.bazelrc.tpl by configure.py.
 
 common:winjax_cuda --override_repository=local_config_cc=C:/Users/oleg/winjax/toolchains/local_config_cc
 common:winjax_cuda --override_repository=xla=C:/Users/oleg/winjax/xla
