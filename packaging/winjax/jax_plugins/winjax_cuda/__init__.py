@@ -104,6 +104,17 @@ def initialize():
     from jax._src import hardware_utils
     hardware_utils.has_visible_nvidia_gpu = lambda: True
 
+    # WDDM memory policy: default to on-demand growth instead of
+    # preallocating 75% of VRAM. On Windows display GPUs (WDDM) a
+    # preallocated device pool is charged against the process' host commit
+    # limit, and re-initializing after jax.clear_backends() races the
+    # driver's asynchronous release of the old pool: the fresh pool then
+    # seizes the entire GPU budget and pinned-host (cuMemHostAlloc)
+    # allocations fail process-wide. On-demand growth (the standard
+    # XLA_PYTHON_CLIENT_PREALLOCATE=false mode) avoids both. Set the
+    # variable explicitly to override.
+    os.environ.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
+
     # All environment/DLL-search changes must happen BEFORE the plugin DLL is
     # loaded: its C runtime snapshots the process environment at load time.
     dll_dirs = _cuda_dll_dirs()
@@ -328,7 +339,25 @@ def initialize():
     capsule = capsule_new(api_ptr, b"pjrt_c_api", None)
 
     from jax._src import xla_bridge as xb
-    c_api = xb.register_plugin("cuda", priority=500, c_api=capsule)
+    from jax._src.lib import xla_client
+    # Pass the standard GPU plugin options (allocator kind, memory fraction,
+    # preallocation, collective memory size) like upstream's cuda plugin
+    # does; without them the plugin ignores XLA_PYTHON_CLIENT_* entirely.
+    # The callable defers env reading to client-creation time.
+    c_api = xb.register_plugin(
+        "cuda", priority=500, c_api=capsule,
+        options=xla_client.generate_pjrt_gpu_plugin_options)
+
+    # Register the plugin's PJRT profiler extension (CUPTI device tracing).
+    # jax's register_plugin() only does this on its library_path branch, not
+    # on the c_api branch used here; without it, jax.profiler traces contain
+    # host planes but no /device:GPU planes.
+    try:
+        from jax._src.lib import _profiler
+        _profiler.register_plugin_profiler(c_api)
+    except (ImportError, AttributeError) as e:
+        print(f"winjax: could not register plugin profiler: {e}",
+              file=sys.stderr)
 
     # Wire the Python-side kernel registrations from the jax_cuda13_plugin
     # kernels wheel (custom-call/FFI handlers for solver/linalg/prng/etc.)
