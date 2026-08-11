@@ -61,3 +61,6 @@ testpypi.txt
 packaging/repack_tmp*/
 !build/
 !build/**
+
+!docs/
+!docs/**
