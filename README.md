@@ -51,6 +51,11 @@ print((x @ x)[0, 0])            # runs on the GPU
 - **JAX's own test suite passes** against this backend: ~36,400 tests,
   0 failures across 155 test files on an RTX 5090 (see `KNOWN_ISSUES.md`
   for watch items).
+
+### Limitations
+
+- **Single GPU.** NCCL does not exist on Windows; multi-GPU collectives and
+  distributed execution are out of scope.
 - **PyTorch in the same process is not supported** (a Windows process can
   hold only one cuDNN family, and torch bundles its own of a different
   version). winjax detects the situation and degrades predictably with a
@@ -58,11 +63,6 @@ print((x @ x)[0, 0])            # runs on the GPU
   cuDNN ops (conv/attention) are unavailable; import jax first and jax
   works fully while `import torch` will fail. Use separate processes when
   you need both.
-
-### Limitations
-
-- **Single GPU.** NCCL does not exist on Windows; multi-GPU collectives and
-  distributed execution are out of scope.
 - **No Pallas / Mosaic GPU** (POSIX-only for now; excluded from the wheels).
 - Python 3.13/3.14 only, matching the official Windows `jaxlib` wheels.
 - The GPU runs in WDDM mode (display driver); very long individual kernels
@@ -118,20 +118,27 @@ generated cuDNN import libraries.
 
 ## Building from source
 
-You need VS2022 (MSVC + Windows SDK), LLVM/clang ≥ 19, a CUDA 13.x toolkit,
-MSYS2 (`patch`), and Bazelisk. From the `jax/` checkout at the pinned release
-tag:
+See **[BUILDING.md](BUILDING.md)** for complete from-scratch instructions.
+The short version: install VS2022 (MSVC + Windows SDK), LLVM/clang ≥ 19, a
+CUDA 13.x toolkit, MSYS2 (`patch`), Bazelisk, and Python 3.13; clone `jax`
+(tag `jax-v0.11.0`, plus `patches/jax`) and `xla`
+(eterevsky/xla, branch `winjax-0.11.0`); then:
+
+```
+python configure.py --patch-externals
+```
+
+generates every machine-specific toolchain file (the committed tree contains
+none) and applies the Windows-port patch series to the Bazel external repos.
+From the `jax/` checkout:
 
 ```
 bazel --bazelrc=../toolchains/winjax_cuda.bazelrc build \
     --config=win_clang --config=winjax_cuda \
+    --repo_env=HERMETIC_PYTHON_VERSION=3.13 --repo_env=ML_WHEEL_TYPE=release \
     @xla//xla/pjrt/c:pjrt_c_api_gpu_plugin.so \
     //jaxlib/tools:jax_cuda13_plugin_wheel
 ```
-
-A `configure.py` that regenerates the machine-specific toolchain snapshot is
-planned; until then the paths in `toolchains/` reflect the reference build
-machine.
 
 ## Upstream
 
