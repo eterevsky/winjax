@@ -112,3 +112,17 @@ Root causes (two, stacked):
 | `memories_test::test_pallas_kernels_can_overlap_using_multiple_streams` | Pallas/Mosaic-GPU excluded from Windows wheels |
 | `pgle_test::testAutoPgleWithCommandBuffers0/1` | multi-GPU (NCCL) by design |
 | `profiler_session_test` (3 tests) | upstream Bazel-only test; fails on Windows CPU identically |
+
+## Skip-reason breakdown (from -rs rerun of the top-8 skipping files)
+
+| Reason class | Share | Skipped upstream too? |
+|---|---|---|
+| "Test requires 2/4/8 global/local devices, found 1" (pjit, shard_map, array, api) | ~90% of sampled reasons | Yes — identical on any single-GPU machine, incl. Linux CUDA; these run in CPU sweeps (8 simulated host devices) and multi-chip CI |
+| Platform-matrix skips (export_harnesses_multi_platform: 2,243) | dominant by raw count | Yes — the file iterates cpu/gpu/tpu harness variants and skips absent platforms on every backend |
+| "Skipped unless running on devices with tags: cpu" | ~20 tests | Yes — cpu-only tests skip on all GPU backends |
+| "Schur not supported on GPU" (linalg) | 3 | Yes — upstream GPU behavior, same on Linux CUDA |
+| Upstream-disabled ("TODO(mattjj): re-enable...", conditional consts) | ~10 | Yes — disabled in-tree |
+
+**No winjax-specific skip reasons were found** — nothing Windows-conditional,
+nothing marking winjax gaps. Skip parity with single-GPU Linux CUDA is
+structural, not incidental.
