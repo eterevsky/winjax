@@ -91,9 +91,11 @@ generated cuDNN import libraries.
 
 ## Repository layout
 
-- `packaging/` — the three wheel sources (`winjax`, `winjax_cuda13_pjrt`,
-  `winjax_cuda13_plugin`); `packaging/dist-release/` holds the current
-  production wheel set.
+- `packaging/` — the three wheel sources (`packaging/winjax/` is the loader
+  package, including the canonical `jax_plugins/winjax_cuda/__init__.py`;
+  `packaging/winjax_cuda13_pjrt/`, `packaging/winjax_cuda13_plugin/` build the
+  binary wheels); `packaging/dist-release/` holds the current production
+  wheel set.
 - `toolchains/` — Bazel override repositories and the compiler wrapper:
   `winjax_cuda.bazelrc` (entry point), `local_config_cc/` (CC toolchain +
   `winjax_cc_wrapper.py`), `local_config_cuda_win/`, `cuda_repos/<name>/`
@@ -103,8 +105,8 @@ generated cuDNN import libraries.
   (triton, rmm, raft, rapids_logger, abseil, protobuf, eigen, jax,
   local_config_rocm). Apply with `git apply` / `patch -p1 -E`; see
   `patches/README.md`.
-- `winjax/` — the loader package source.
-- `build/` — build & test-sweep drivers.
+- `build/` — build & test-sweep drivers (`run_test_sweep.py`; `SWEEP_ALL=1`
+  for the no-exclusions audit mode).
 - `xla/`, `jax/`, `tools/`, `.venv*/` (ignored) — the XLA checkout (own
   repo/fork), the unmodified JAX build workspace, downloaded toolchains, and
   Python environments.

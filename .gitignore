@@ -42,3 +42,7 @@ testpypi.txt
 
 !examples/
 !examples/**
+
+packaging/repack_tmp*/
+!build/
+!build/**

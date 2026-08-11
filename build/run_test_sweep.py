@@ -11,15 +11,18 @@ import subprocess
 import sys
 import time
 
-JAX = r"C:\Users\oleg\winjax\jax"
-PY = r"C:\Users\oleg\winjax\.venv\Scripts\python.exe"
-LOGS = os.environ.get("SWEEP_LOGS", r"C:\Users\oleg\winjax\test_logs")
+# Repo root = parent of this script's directory (script lives in build/).
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+JAX = os.environ.get("SWEEP_JAX", os.path.join(_ROOT, "jax"))
+PY = os.environ.get("SWEEP_PYTHON", sys.executable)
+LOGS = os.environ.get("SWEEP_LOGS", os.path.join(_ROOT, "test_logs"))
 PER_FILE_TIMEOUT = 100 * 60  # seconds
 
 # Multi-process / multi-GPU / distributed / mock-GPU / mosaic (not in the
 # Windows wheel) test files are out of scope for the single-GPU sweep.
 # Single-device pmap/shard_map/pjit ARE in scope.
-EXCLUDE = {
+# SWEEP_ALL=1 runs them anyway (full-audit mode, expect failures there).
+EXCLUDE = set() if os.environ.get("SWEEP_ALL") == "1" else {
     "distributed_initialize_test.py",  # requires jax.distributed multi-process
     "distributed_test.py",             # multi-process distributed service
     "fused_attention_stablehlo_multigpu_test.py",  # needs >= 2 GPUs
@@ -39,7 +42,14 @@ FILES = sorted(
 
 os.makedirs(LOGS, exist_ok=True)
 env = dict(os.environ)
-env["CUDA_ROOT"] = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3"
+# Optional: point XLA at a local CUDA toolkit; nvidia pip wheels otherwise
+# provide ptxas/libdevice, so this is not required in shipping installs.
+if "CUDA_ROOT" not in env:
+    _tk = r"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA"
+    if os.path.isdir(_tk):
+        versions = sorted(os.listdir(_tk), reverse=True)
+        if versions:
+            env["CUDA_ROOT"] = os.path.join(_tk, versions[0])
 # Note: JAX_PLATFORMS is deliberately NOT set: forcing "cuda" hides the CPU
 # backend, which some tests legitimately need (causes false failures).
 

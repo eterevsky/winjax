@@ -27,8 +27,8 @@ t_proc0 = time.perf_counter()
 import jax
 import jax.numpy as jnp
 
-CKPT = r"C:\Users\oleg\winjax\models\gemma4-e4b-it"
-TOK = r"C:\Users\oleg\winjax\models\tokenizer_gemma4.model"
+CKPT = os.environ.get("GEMMA_CKPT_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models", "gemma4-e4b-it"))
+TOK = os.environ.get("GEMMA_TOKENIZER", os.path.join(os.path.dirname(CKPT), "tokenizer_gemma4.model"))
 
 PROMPT = (
     "<start_of_turn>user\n"

@@ -14,9 +14,9 @@ import urllib.request
 
 BUCKET = "gemma-data"
 PREFIX = "checkpoints/gemma4-e4b-it"
-DEST = r"C:\Users\oleg\winjax\models\gemma4-e4b-it"
+DEST = os.environ.get("GEMMA_CKPT_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models", "gemma4-e4b-it"))
 TOKENIZER_OBJ = "tokenizers/tokenizer_gemma4.model"
-TOKENIZER_DEST = r"C:\Users\oleg\winjax\models\tokenizer_gemma4.model"
+TOKENIZER_DEST = os.environ.get("GEMMA_TOKENIZER", os.path.join(os.path.dirname(DEST), "tokenizer_gemma4.model"))
 
 CHUNK = 16 * 1024 * 1024
 
