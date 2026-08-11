@@ -51,8 +51,13 @@ print((x @ x)[0, 0])            # runs on the GPU
 - **JAX's own test suite passes** against this backend: ~36,400 tests,
   0 failures across 155 test files on an RTX 5090 (see `KNOWN_ISSUES.md`
   for watch items).
-- Verified coexistence with PyTorch's bundled cuDNN in the same process
-  (winjax preloads its cuDNN privately instead of mutating `PATH`).
+- **PyTorch in the same process is not supported** (a Windows process can
+  hold only one cuDNN family, and torch bundles its own of a different
+  version). winjax detects the situation and degrades predictably with a
+  clear warning: import torch first and torch works fully while jax's
+  cuDNN ops (conv/attention) are unavailable; import jax first and jax
+  works fully while `import torch` will fail. Use separate processes when
+  you need both.
 
 ### Limitations
 
