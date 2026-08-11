@@ -18,9 +18,6 @@ the entire CUDA userland — cuDNN, cuBLAS, cuFFT, CUPTI, NVRTC, `ptxas`,
 `libdevice` — from NVIDIA's own pip wheels. No CUDA toolkit installation, no
 cuDNN download, no environment variables.
 
-> Until the first production PyPI release lands, install the verified preview
-> from TestPyPI:
-> `pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ winjax`
 
 ### Requirements
 
@@ -44,13 +41,15 @@ x = jnp.ones((4096, 4096))
 print((x @ x)[0, 0])            # runs on the GPU
 ```
 
-## Status
+## Status: beta
 
 - Each winjax release is pinned to a specific `jax`/`jaxlib` release
   (currently **0.11.0**) — `pip install winjax` brings the matching pair.
-- **JAX's own test suite passes** against this backend: ~36,400 tests,
-  0 failures across 155 test files on an RTX 5090 (see `KNOWN_ISSUES.md`
-  for watch items).
+- **JAX's own test suite passes** against this backend — all 164 test
+  files, no exclusions: 28,700+ tests executed, **zero unexplained
+  failures**; the six documented exclusion tests (Mosaic, multi-GPU PGLE,
+  Bazel-only profiler-session) are audited in
+  [docs/TEST_AUDIT_0.11.0.md](docs/TEST_AUDIT_0.11.0.md).
 
 ### Limitations
 

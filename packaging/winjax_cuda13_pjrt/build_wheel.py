@@ -15,7 +15,7 @@ import sys
 import zipfile
 
 NAME = "winjax_cuda13_pjrt"
-VERSION = "0.11.0"
+VERSION = "0.11.0.post2"
 TAG = "py3-none-win_amd64"
 
 METADATA = f"""\
